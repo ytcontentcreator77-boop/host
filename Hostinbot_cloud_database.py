@@ -7417,7 +7417,7 @@ def render_admin_subroute(call: types.CallbackQuery, data: str) -> None:
     if data == "adm_ref_set_reward":
         USER_STATES[call.from_user.id] = {"flow": "await_adm_ref_reward"}
         bot.send_message(call.message.chat.id,
-                         f"{G['settings']} {sc('Send wallet reward amount per referral (in ৳)')}."); return
+                         f"{G['settings']} {sc('Send wallet reward amount per referral')} ({currency_symbol()})."); return
     if data == "adm_ref_set_min_plan":
         USER_STATES[call.from_user.id] = {"flow": "await_adm_ref_min_plan"}
         plans = ", ".join(PLAN_LIMITS.keys())
@@ -7481,10 +7481,10 @@ def render_admin_subroute(call: types.CallbackQuery, data: str) -> None:
     if data == "adm_rev_goals":           return render_adm_rev_goals(call)
     if data == "adm_goal_set_monthly":
         USER_STATES[call.from_user.id] = {"flow": "await_adm_goal_set", "goal_type": "monthly"}
-        bot.send_message(call.message.chat.id, f"{G['settings']} {sc('Send monthly revenue target (৳)')}:"); return
+        bot.send_message(call.message.chat.id, f"{G['settings']} {sc('Send monthly revenue target')} ({currency_symbol()}):"); return
     if data == "adm_goal_set_yearly":
         USER_STATES[call.from_user.id] = {"flow": "await_adm_goal_set", "goal_type": "yearly"}
-        bot.send_message(call.message.chat.id, f"{G['settings']} {sc('Send yearly revenue target (৳)')}:"); return
+        bot.send_message(call.message.chat.id, f"{G['settings']} {sc('Send yearly revenue target')} ({currency_symbol()}):"); return
     if data == "adm_goal_history":        return render_adm_goal_history(call)
     # Scheduler
     if data == "adm_scheduler":           return render_adm_scheduler(call)
@@ -7690,7 +7690,7 @@ def render_adm_stats(call: types.CallbackQuery) -> None:
         f"{bullet('New this week', new_week)}\n"
         f"{bullet('Total bots',   len(bots))}\n"
         f"{bullet('Bots running', sum(1 for x in RUNNING.values() if x['proc'].poll() is None))}\n"
-        f"{bullet('Revenue',      '{}$'.format(revenue))}\n"
+        f"{bullet('Revenue', format_money(revenue))}\n"
         f"{bullet('Storage',      fmt_bytes(storage_size))}\n"
         f"{bullet('Panel RSS',    fmt_bytes(rss))}\n"
         f"{bullet('Uptime',       fmt_dur(int(time.time() * 1000) - START_TS))}\n"
@@ -8253,7 +8253,7 @@ def render_adm_analytics(call: types.CallbackQuery) -> None:
     cap = (
         f"<b>📊 {sc('Analytics Dashboard')}</b>\n"
         f"{G['div_eq']}\n"
-        f"{bullet('Total Revenue',   f'{total_rev}৳')}\n"
+        f"{bullet('Total Revenue', format_money(total_rev))}\n"
         f"{bullet('Total Users',     len(d['users']))}\n"
         f"{bullet('Total Bots',      len(d['bots']))}\n"
         f"{bullet('Bots Running',    running_n)}\n"
@@ -8293,14 +8293,14 @@ def render_adm_revenue_report(call: types.CallbackQuery) -> None:
     for p in pays:
         if p.get("status") == "approved":
             plan_rev[p.get("plan", "unknown")] += p.get("amount", 0)
-    by_plan = "\n".join(f"{bullet(k, f'{v}৳')}" for k, v in sorted(plan_rev.items()))
+    by_plan = "\n".join(f"{bullet(k, format_money(v))}" for k, v in sorted(plan_rev.items()))
     cap = (
         f"<b>📈 {sc('Revenue Report')}</b>\n"
         f"{G['div_eq']}\n"
-        f"{bullet('Today',        f'{rev_day}৳')}\n"
-        f"{bullet('Last 7 days',  f'{rev_week}৳')}\n"
-        f"{bullet('Last 30 days', f'{rev_month}৳')}\n"
-        f"{bullet('All time',     f'{rev_all}৳')}\n"
+        f"{bullet('Today',        format_money(rev_day))}\n"
+        f"{bullet('Last 7 days',  format_money(rev_week))}\n"
+        f"{bullet('Last 30 days', format_money(rev_month))}\n"
+        f"{bullet('All time',     format_money(rev_all))}\n"
         f"{G['div']}\n<b>{sc('By Plan')}:</b>\n{by_plan}{FOOTER}"
     )
     show_menu(call.message.chat.id, PHOTOS["admin"], cap, _adm_back("adm_analytics"), call=call)
@@ -9803,7 +9803,7 @@ def render_adm_pay_limits(call: types.CallbackQuery) -> None:
         f"{G['div_eq']}\n"
         f"{bullet('Min Payment',      format_money(min_amt))}\n"
         f"{bullet('Max Payment',      format_money(max_amt))}\n"
-        f"{bullet('Discount >= ৳',   disc_threshold)}\n"
+        f"{bullet(f'Discount >= {currency_symbol()}',   disc_threshold)}\n"
         f"{bullet('Discount %',       f'{disc_pct}%')}\n"
         f"{G['div']}\n"
         f"{sc('Set limits below. All values in your currency unit.')}{FOOTER}"
@@ -9830,7 +9830,7 @@ def render_adm_pay_currency(call: types.CallbackQuery) -> None:
         f"{bullet('Currency Code', cur)}\n"
         f"{bullet('Symbol',        sym)}\n"
         f"{G['div']}\n"
-        f"{sc('Examples')}: BDT/৳, USD/$, EUR/€, INR/₹, NPR/रू, PKR/₨{FOOTER}"
+        f"{sc('Examples')}: {currency_symbol()} {str(get_setting('payment_currency', 'INR')).upper()}{FOOTER}"
     )
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
@@ -10293,7 +10293,7 @@ def render_adm_coupon_analytics(call: types.CallbackQuery) -> None:
         f"<b>📊 {sc('Coupon Analytics')}</b>\n"
         f"{G['div_eq']}\n"
         f"{bullet('Total Coupons',    len(coupons))}\n"
-        f"{bullet('Total Savings Given', f'{total_savings:.0f}৳')}\n"
+        f"{bullet('Total Savings Given', format_money(total_savings))}\n"
         f"{G['div']}\n<b>{sc('By Plan')}:</b>\n{plan_rows}\n{G['div']}{FOOTER}"
     )
     show_menu(call.message.chat.id, PHOTOS.get("coupon_plus", PHOTOS["coupon"]), cap,
@@ -10371,10 +10371,10 @@ def render_adm_referral_sys(call: types.CallbackQuery) -> None:
         f"<b>🔗 {sc('Referral System')}</b>\n"
         f"{G['div_eq']}\n"
         f"{bullet('Status',        '✅ Enabled' if enabled else '❌ Disabled')}\n"
-        f"{bullet('Reward/Refer',  f'{reward}৳ wallet credit')}\n"
+        f"{bullet('Reward/Refer',  f'{format_money(reward)} wallet credit')}\n"
         f"{bullet('Min Plan',      min_plan)}\n"
         f"{bullet('Total Referrals', total_refs)}\n"
-        f"{bullet('Total Paid Out',  f'{total_paid}৳')}\n"
+        f"{bullet('Total Paid Out',  format_money(total_paid))}\n"
         f"{G['div']}{FOOTER}"
     )
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -10389,7 +10389,7 @@ def render_adm_referral_sys(call: types.CallbackQuery) -> None:
         Btn("🏆  Lᴇᴀᴅᴇʀʙᴏᴀʀᴅ",   callback_data="adm_ref_leaderboard", style="primary"),
     )
     kb.add(
-        Btn("✏️  Sᴇᴛ Rᴇᴡᴀʀᴅ ৳", callback_data="adm_ref_set_reward",   style="primary"),
+        Btn(f"✏️  Sᴇᴛ Rᴇᴡᴀʀᴅ {currency_symbol()}", callback_data="adm_ref_set_reward",   style="primary"),
         Btn("✏️  Sᴇᴛ Mɪɴ Pʟᴀɴ", callback_data="adm_ref_set_min_plan", style="primary"),
     )
     kb.add(Btn(f"{G['back']}  Aᴅᴍɪɴ", callback_data="menu_admin", style="primary"))
@@ -10417,7 +10417,7 @@ def render_adm_ref_stats(call: types.CallbackQuery) -> None:
         f"{G['div_eq']}\n"
         f"{bullet('Total Referrals', total_refs)}\n"
         f"{bullet('Today',           today_refs)}\n"
-        f"{bullet('Total Paid',      f'{total_paid}৳')}\n"
+        f"{bullet('Total Paid',      format_money(total_paid))}\n"
         f"{G['div']}\n<b>{sc('Top Referrers')}:</b>\n{rows}\n{G['div']}{FOOTER}"
     )
     show_menu(call.message.chat.id, PHOTOS.get("referral_adm", PHOTOS["referral"]), cap,
@@ -10431,7 +10431,7 @@ def render_adm_ref_rewards(call: types.CallbackQuery) -> None:
     cap = (
         f"<b>🎁 {sc('Referral Reward Config')}</b>\n"
         f"{G['div_eq']}\n"
-        f"{bullet('Base Reward',         f'{reward}৳ per referral')}\n"
+        f"{bullet('Base Reward',         f'{format_money(reward)} per referral')}\n"
         f"{bullet('Bonus Plan',          bonus_plan or 'None')}\n"
         f"{bullet('Bonus Threshold',     f'{bonus_refs} refs needed for bonus')}\n"
         f"{G['div']}\n"
@@ -10894,14 +10894,14 @@ def render_adm_rev_goals(call: types.CallbackQuery) -> None:
         f"<b>💎 {sc('Revenue Goals')}</b>\n"
         f"{G['div_eq']}\n"
         f"<b>{sc('This Month')} ({month_start})</b>\n"
-        f"  {sc('Earned')}: <b>{rev_month}৳</b> / {goal_month or '?'}৳\n"
+        f"  {sc('Earned')}: <b>{format_money(rev_month)}</b> / {format_money(goal_month) if goal_month else '?'}\n"
         f"  {progress_bar(rev_month, goal_month)}\n"
         f"{G['div']}\n"
         f"<b>{sc('This Year')} ({year_start})</b>\n"
-        f"  {sc('Earned')}: <b>{rev_year}৳</b> / {goal_year or '?'}৳\n"
+        f"  {sc('Earned')}: <b>{format_money(rev_year)}</b> / {format_money(goal_year) if goal_year else '?'}\n"
         f"  {progress_bar(rev_year, goal_year)}\n"
         f"{G['div']}\n"
-        f"{bullet('All Time',   f'{rev_all}৳')}\n"
+        f"{bullet('All Time',   format_money(rev_all))}\n"
         f"{G['div']}{FOOTER}"
     )
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -10928,7 +10928,7 @@ def render_adm_goal_history(call: types.CallbackQuery) -> None:
         if len(ts) >= 7:
             months[ts[:7]] += p.get("amount", 0)
     rows = "\n".join(
-        f"{G['bullet']} <b>{m}</b>: {amt:.0f}৳"
+        f"{G['bullet']} <b>{m}</b>: {format_money(amt)}"
         for m, amt in sorted(months.items(), reverse=True)[:12]
     ) or f"<i>{sc('No revenue data')}</i>"
     cap = (
@@ -11367,7 +11367,7 @@ def render_adm_lb_spenders(call: types.CallbackQuery) -> None:
     users_db = db_load()["users"]
     rows = "\n".join(
         f"{i}. <b>{esc(users_db.get(uid,{}).get('name','?')[:20])}</b> "
-        f"<code>{uid}</code> — <b>{amt:.0f}৳</b>"
+        f"<code>{uid}</code> — <b>{format_money(amt)}</b>"
         for i, (uid, amt) in enumerate(top, 1)
     ) or f"<i>{sc('No data')}</i>"
     cap = f"<b>💰 {sc('Top Spenders')}</b>\n{G['div_eq']}\n{rows}\n{G['div']}{FOOTER}"
@@ -11397,7 +11397,7 @@ def render_adm_lb_referrals(call: types.CallbackQuery) -> None:
                  key=lambda x: len(x[1].get("referrals",[])), reverse=True)[:15]
     rows = "\n".join(
         f"{i}. <b>{esc(u.get('name','?')[:20])}</b> — "
-        f"{len(u.get('referrals',[]))} refs | {u.get('referral_earnings',0)}৳"
+        f"{len(u.get('referrals',[]))} refs | {format_money(u.get('referral_earnings',0))}"
         for i, (uid, u) in enumerate(top, 1) if u.get("referrals")
     ) or f"<i>{sc('No referrals yet')}</i>"
     cap = f"<b>🔗 {sc('Top Referrers')}</b>\n{G['div_eq']}\n{rows}\n{G['div']}{FOOTER}"
@@ -18404,7 +18404,7 @@ def render_admin(call: types.CallbackQuery) -> None:
         f"{bullet('Users',   len(d['users']))}\n"
         f"{bullet('Bots',    len(d['bots']))}\n"
         f"{bullet('Running', running_n)}\n"
-        f"{bullet('Revenue', '{}$'.format(revenue))}\n"
+        f"{bullet('Revenue', format_money(revenue))}\n"
         f"{bullet('Pending', pending_n)}\n"
         f"{G['div']}{FOOTER}"
     )
@@ -20545,7 +20545,7 @@ def on_text(m: types.Message) -> None:
                 db_save(d)
                 audit(uid, "wallet_adjust", f"uid={target_uid} old={cur} new={new_bal}")
                 USER_STATES.pop(uid, None)
-                bot.reply_to(m, f"{G['ok']} uid <code>{target_uid}</code>: <b>{cur}$</b> \u2192 <b>{new_bal}$</b>",
+                bot.reply_to(m, f"{G['ok']} uid <code>{target_uid}</code>: <b>{format_money(cur)}</b> \u2192 <b>{format_money(new_bal)}</b>",
                              parse_mode="HTML")
             except Exception as _we:
                 bot.reply_to(m, f"{G['no']} Error: <code>{esc(_we)}</code>", parse_mode="HTML")
