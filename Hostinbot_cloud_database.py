@@ -1309,7 +1309,14 @@ PAYMENT_METHODS: Dict[str, Dict[str, Any]] = {
 
 # Currency is centralized so every user/admin screen uses the configured code and symbol.
 def currency_symbol() -> str:
-    return str(get_setting("currency_symbol", "₹") or "₹")
+    """Resolve one display symbol from the selected ISO currency code.
+    Ignore stale legacy symbols (e.g. BDT symbol stored while code is INR)."""
+    code = str(get_setting("payment_currency", "INR") or "INR").upper().strip()
+    expected = _CURRENCY_SYMBOLS.get(code, "₹" if code == "INR" else code + " ")
+    custom = str(get_setting("currency_symbol", "") or "").strip()
+    if bool(get_setting("currency_symbol_custom", False)) and custom:
+        return custom
+    return expected
 
 def format_money(amount: Any) -> str:
     try:
@@ -1488,14 +1495,18 @@ def _build_local_photos() -> None:
             d.rectangle([(0, 430), (900, 460)], fill=(255, 255, 255))
             d.rectangle([(0, 432), (900, 458)], fill=(r, g, b))
 
+            # Use regular ASCII labels: small-cap Unicode glyphs are missing
+            # from many fallback fonts and render as tiny/tofu text on Railway.
+            text = text.translate(_SC_MAP).upper() if "_SC_MAP" in globals() else text
+            sub = sub.translate(_SC_MAP).upper() if "_SC_MAP" in globals() else sub
             try:
                 big = ImageFont.truetype(font_path, 78) if font_path else ImageFont.load_default(size=78)
-            except TypeError:
-                big = ImageFont.load_default()
+            except Exception:
+                big = ImageFont.load_default(size=78)
             try:
                 small = ImageFont.truetype(font_path, 32) if font_path else ImageFont.load_default(size=32)
-            except TypeError:
-                small = ImageFont.load_default()
+            except Exception:
+                small = ImageFont.load_default(size=32)
 
             def _wh(s: str, f) -> Tuple[int, int]:
                 try:
@@ -8328,7 +8339,7 @@ def render_adm_top_users(call: types.CallbackQuery) -> None:
         u = d["users"].get(uid, {})
         name = esc(u.get("name") or uid)
         bot_count = sum(1 for b in d["bots"].values() if str(b.get("owner")) == uid)
-        rows.append(f"{i}. {name} — <b>{amt}৳</b> {G['bullet']} {bot_count} bots")
+        rows.append(f"{i}. {name} — <b>{format_money(amt)}</b> {G['bullet']} {bot_count} bots")
     cap = (
         f"<b>🏆 {sc('Top Users by Spending')}</b>\n"
         f"{G['div_eq']}\n"
@@ -10398,7 +10409,7 @@ def render_adm_ref_stats(call: types.CallbackQuery) -> None:
     )
     rows = "\n".join(
         f"{i}. {esc(u.get('name','?')[:20])} — {len(u.get('referrals',[]))} refs "
-        f"| earned {u.get('referral_earnings',0)}৳"
+        f"| earned {format_money(u.get('referral_earnings',0))}"
         for i, (uid, u) in enumerate(top_refs, 1)
     ) or f"<i>{sc('No referrals yet')}</i>"
     cap = (
@@ -10442,7 +10453,7 @@ def render_adm_ref_leaderboard(call: types.CallbackQuery) -> None:
     rows = "\n".join(
         f"{i}. <b>{esc(u.get('name','?')[:20])}</b> — "
         f"{len(u.get('referrals',[]))} {sc('refs')} | "
-        f"{u.get('referral_earnings',0)}৳ {sc('earned')}"
+        f"{format_money(u.get('referral_earnings',0))} {sc('earned')}"
         for i, (uid, u) in enumerate(top, 1)
     ) or f"<i>{sc('No referrals yet')}</i>"
     cap = (
@@ -12352,7 +12363,7 @@ def on_text(m: types.Message) -> None:
                         f"@{esc(u.get('username','—'))} "
                         f"plan={u.get('plan','free')} "
                         f"bots={bot_count} "
-                        f"wallet={u.get('wallet',0)}৳ "
+                        f"wallet={format_money(u.get('wallet',0))} "
                         f"{'🚫banned' if u.get('banned') else ''}"
                     )
             USER_STATES.pop(uid, None)
@@ -12388,7 +12399,7 @@ def on_text(m: types.Message) -> None:
                 audit(uid, "wallet_adjust", f"uid={target_uid} old={cur} new={new_bal}")
                 USER_STATES.pop(uid, None)
                 bot.reply_to(m, f"{G['ok']} uid <code>{target_uid}</code> wallet: "
-                                f"<b>{cur}৳</b> → <b>{new_bal}৳</b>",
+                                f"<b>{format_money(cur)}</b> → <b>{format_money(new_bal)}</b>",
                              parse_mode="HTML")
             except Exception as _we:
                 bot.reply_to(m, f"{G['no']} {sc('Error')}: <code>{esc(_we)}</code>",
@@ -12640,7 +12651,7 @@ def on_text(m: types.Message) -> None:
                 amount = int(text.strip())
                 set_setting("referral_reward_amount", amount)
                 audit(uid, "ref_reward_set", str(amount))
-                bot.reply_to(m, f"{G['ok']} {sc('Referral reward set to')} {amount}৳")
+                bot.reply_to(m, f"{G['ok']} {sc('Referral reward set to')} {format_money(amount)}")
             except ValueError:
                 bot.reply_to(m, f"{G['no']} {sc('Please send a valid integer.')}")
             return
@@ -12700,7 +12711,7 @@ def on_text(m: types.Message) -> None:
                 key = "rev_goal_monthly" if goal_type == "monthly" else "rev_goal_yearly"
                 set_setting(key, amount)
                 audit(uid, f"goal_set_{goal_type}", str(amount))
-                bot.reply_to(m, f"{G['ok']} {goal_type.title()} {sc('goal set to')} {amount}৳")
+                bot.reply_to(m, f"{G['ok']} {goal_type.title()} {sc('goal set to')} {format_money(amount)}")
             except ValueError:
                 bot.reply_to(m, f"{G['no']} {sc('Please send a valid integer.')}")
             return
@@ -13619,7 +13630,7 @@ def _handle_bot_upload(m: types.Message) -> None:
     # The upload menu stores the user's selection in USER_STATES.
     # If no selection exists (legacy flow), fall back to Auto Detect.
     upload_state = USER_STATES.get(uid) or {}
-    selected_type = upload_st.get("upload_type", "auto")
+    selected_type = upload_state.get("upload_type", "auto")
     if selected_type not in ("tg", "wa", "discord", "auto"):
         selected_type = "auto"
 
@@ -17637,8 +17648,16 @@ def render_upload_menu(call: types.CallbackQuery) -> None:
         f"Entry detection: <code>bot.py main.py app.py index.js</code>\n"
         f"All files are <b>encrypted at rest</b>.{rules_block}"
     )
-    USER_STATES[uid] = {"flow": "await_upload"}
-    show_menu(call.message.chat.id, PHOTOS["upload"], cap + FOOTER, back_main_kb(), call=call)
+    # Keep the platform-selection gate active; don't accept an upload until
+    # the user chooses TG / WhatsApp / Discord / Auto Detect.
+    USER_STATES[uid] = {"flow": "await_upload_type"}
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(Btn("🤖 TG Bot", callback_data="upload_type_tg"),
+           Btn("💬 WhatsApp Bot", callback_data="upload_type_wa"))
+    kb.add(Btn("🎮 Discord Bot", callback_data="upload_type_discord"),
+           Btn("🧠 Auto Detect", callback_data="upload_type_auto"))
+    kb.add(Btn(f"{G['back']} {sc('Main Menu')}", callback_data="menu_main"))
+    show_menu(call.message.chat.id, PHOTOS["upload"], cap + FOOTER, kb, call=call)
 
 
 def render_plans_menu(call: types.CallbackQuery) -> None:
@@ -20211,22 +20230,24 @@ def on_document(m: types.Message) -> None:
     doc = m.document
     fname = (doc.file_name or "").lower()
     is_bot_file = fname.endswith((".py", ".js", ".zip"))
-    if flow == "await_upload" or (is_bot_file and flow == "await_upload_type"):
-        # A bot-looking file sent before platform selection is ignored with a
-        # clear prompt; normal documents are never hijacked by the hoster.
-        if flow == "await_upload_type":
-            bot.reply_to(
-                m,
-                f"<b>🧭 Choose upload type first</b>\\n"
-                f"{G['div']}\\n"
-                f"{sc('Tap Upload Bot again and select TG Bot, WhatsApp Bot, Discord Bot, or Auto Detect.')}",
-                parse_mode="HTML",
-            )
-            return
+    if flow == "await_upload":
         d = db_load()
         if str(uid) not in d["users"]:
             bot.reply_to(m, f"{G['no']} Please /start first."); return
-        _handle_bot_upload(m)
+        try:
+            _handle_bot_upload(m)
+        except Exception as upload_error:
+            print(f"[upload] uid={uid} file={fname!r}: {upload_error}", file=sys.stderr, flush=True)
+            bot.reply_to(m,
+                f"{G['no']} Upload processing failed: <code>{esc(str(upload_error)[:500])}</code>\n"
+                f"{sc('Your original Telegram file is still available. Please retry from Upload Bot.')}",
+                parse_mode="HTML")
+        return
+    if is_bot_file:
+        bot.reply_to(m,
+            f"{G['warn']} {sc('Open Upload Bot, choose the platform, then send this file as a document.')}",
+            parse_mode="HTML")
+        return
 
 
 @bot.message_handler(func=lambda m: True, content_types=["text"])
