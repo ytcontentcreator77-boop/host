@@ -1457,7 +1457,15 @@ def _build_local_photos() -> None:
         c = c.lstrip("#")
         return int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
 
+    # Convert Unicode small-cap glyphs to ordinary ASCII before rasterizing.
+    # DejaVu/fallback fonts on minimal Linux images often lack these glyphs.
+    banner_map = str.maketrans(
+        "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘꜱᴛᴜᴠᴡxʏᴢ",
+        "abcdefghijklmnopqrstuvwxyz",
+    )
     for key, (text, color, sub) in _PHOTO_SPECS.items():
+        text = text.translate(banner_map).upper()
+        sub = sub.translate(banner_map).upper()
         # ── Custom admin-uploaded photo takes priority over generated one ──
         # replace_menu_photo() always writes custom_<key>.png as the
         # persistent marker, so this survives restarts and GitHub restores.
@@ -7356,7 +7364,9 @@ def render_admin_subroute(call: types.CallbackQuery, data: str) -> None:
     if data.startswith("adm_bc_set_currency_") and len(data.split("_")) >= 6:
         parts = data[len("adm_bc_set_currency_"):].split("_", 1)
         if len(parts) == 2:
-            set_setting("payment_currency", parts[0]); set_setting("currency_symbol", parts[1])
+            set_setting("payment_currency", parts[0])
+            set_setting("currency_symbol", parts[1])
+            set_setting("currency_symbol_custom", False)
             ack(call, f"{G['ok']} Currency set: {parts[0]} {parts[1]}")
         return render_adm_pay_config(call)
     if data == "adm_app_emoji_reset":
@@ -9204,7 +9214,7 @@ _MESSAGE_TEMPLATES: Dict[str, Dict[str, str]] = {
     },
     "payment_received": {
         "label": "Payment Received",
-        "default": "✅ Payment of {amount}৳ received for {plan} plan. Your account has been upgraded!",
+        "default": "✅ Payment of {amount} received for {plan} plan. Your account has been upgraded!",
         "vars": "{name}, {amount}, {plan}, {tx_id}, {date}",
     },
     "plan_expired": {
@@ -9224,7 +9234,7 @@ _MESSAGE_TEMPLATES: Dict[str, Dict[str, str]] = {
     },
     "referral_reward": {
         "label": "Referral Reward",
-        "default": "🎁 You earned {amount}৳ for referring {referred_name}! Keep sharing!",
+        "default": "🎁 You earned {amount} for referring {referred_name}! Keep sharing!",
         "vars": "{name}, {amount}, {referred_name}",
     },
     "ticket_reply": {
@@ -12605,6 +12615,9 @@ def on_text(m: types.Message) -> None:
             set_setting(setting_key, val_store)
             if setting_key == "payment_currency":
                 set_setting("payment_currency", str(val_store).upper()[:8])
+                set_setting("currency_symbol_custom", False)
+            elif setting_key == "currency_symbol":
+                set_setting("currency_symbol_custom", True)
             audit(uid, f"bc_set_{key}", str(val_store)[:40])
             USER_STATES.pop(uid, None)
             bot.reply_to(m, f"{G['ok']} <b><code>{esc(key)}</code></b> = <code>{esc(str(val_store))}</code>",
@@ -18431,7 +18444,7 @@ def render_adm_stats(call: types.CallbackQuery) -> None:
         f"{bullet('New today', new_today)}\n"
         f"{bullet('Total bots', len(d['bots']))}\n"
         f"{bullet('Running', sum(1 for x in RUNNING.values() if x['proc'].poll() is None))}\n"
-        f"{bullet('Revenue', '{}$'.format(revenue))}\n"
+        f"{bullet('Revenue', format_money(revenue))}\n"
         f"{bullet('Panel RAM', fmt_bytes(int(rss)))}\n"
         f"{bullet('Uptime', fmt_dur(int(time.time() * 1000) - START_TS))}\n"
         f"{G['div']}{FOOTER}"
