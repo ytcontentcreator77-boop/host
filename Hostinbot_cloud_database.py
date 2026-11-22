@@ -16068,10 +16068,16 @@ def _monitor_system_stats():
     return stats
 
 
-def _progress_bar(current, total, width=12):
+def _progress_ratio_bar(current, total, width=12):
+    """Progress bar for current/total counters (e.g. broadcast delivery)."""
+    try:
+        current = max(0, float(current))
+        total = max(0, float(total))
+    except (TypeError, ValueError):
+        current, total = 0, 0
     if total <= 0:
         return "░" * width + " 0%"
-    pct    = min(current / total, 1.0)
+    pct = min(current / total, 1.0)
     filled = int(pct * width)
     return "█" * filled + "░" * (width - filled) + f" {pct*100:.1f}%"
 
@@ -16480,7 +16486,7 @@ def render_adm_broadcast_status(call):
         sent  = st.get("sent", 0)
         fail  = st.get("failed", 0)
         lines.append(f"  {'✅' if done else '🔄'} <code>{jid}</code>")
-        lines.append(f"     {_progress_bar(sent+fail, total)}")
+        lines.append(f"     {_progress_ratio_bar(sent+fail, total)}")
         lines.append(f"     Sent:{sent} Failed:{fail} Total:{total}")
     lines.append(G["div"] + FOOTER)
     show_menu(call.message.chat.id, PHOTOS["admin"], "\n".join(lines), _adm_back("menu_admin"), call=call)
