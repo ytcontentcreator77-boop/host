@@ -6429,6 +6429,28 @@ def action_bot_restart(call: types.CallbackQuery, bot_id: str) -> None:
     render_bot_view(call, bot_id)
 
 
+def tail_log(bot_id: str, lines: int = 60) -> str:
+    """Return the most recent captured child-process output for a hosted bot."""
+    try:
+        info = RUNNING.get(str(bot_id)) or {}
+        captured = info.get("log") or info.get("log_ring") or []
+        if isinstance(captured, str):
+            entries = captured.splitlines()
+        else:
+            entries = [str(item) for item in list(captured)]
+        if not entries:
+            doc = find_bot(str(bot_id))
+            if doc:
+                last_error = str(doc.get("last_error") or "").strip()
+                if last_error:
+                    entries = last_error.splitlines()
+        count = max(1, min(int(lines), 500))
+        return "\\n".join(entries[-count:])
+    except Exception as exc:
+        print(f"[live logs] bot={bot_id}: {exc}", file=sys.stderr, flush=True)
+        return ""
+
+
 def action_bot_logs(call: types.CallbackQuery, bot_id: str) -> None:
     b = find_bot(bot_id)
     if not b:
