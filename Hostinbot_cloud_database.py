@@ -9704,7 +9704,7 @@ def render_adm_pay_config(call: types.CallbackQuery) -> None:
     min_amt = get_setting("min_payment_amount", 50)
     max_amt = get_setting("max_payment_amount", 10000)
     currency = get_setting("payment_currency", "INR")
-    currency_sym = get_setting("currency_symbol", "₹")
+    currency_sym = currency_symbol()
     tax_pct = get_setting("payment_tax_pct", 0)
     methods_enabled = sum(1 for k, m in all_payment_methods().items() if get_setting(f"pm_enabled_{k}", True))
     notif_chan = get_setting("payment_notif_channel", "") or "—"
@@ -9833,7 +9833,7 @@ def render_adm_pay_limits(call: types.CallbackQuery) -> None:
 
 def render_adm_pay_currency(call: types.CallbackQuery) -> None:
     cur = get_setting("payment_currency", "INR")
-    sym = get_setting("currency_symbol",  "₹")
+    sym = currency_symbol()
     cap = (
         f"<b>💱 {sc('Currency Settings')}</b>\n"
         f"{G['div_eq']}\n"
