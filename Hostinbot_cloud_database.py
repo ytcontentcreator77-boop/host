@@ -13488,24 +13488,23 @@ _UPLOAD_TYPE_NAMES = {
 
 _TG_PATTERNS = (
     # Python Telegram libraries and common import forms.
-    r"(?i)\\b(?:telebot|telethon|aiogram|python-telegram-bot)\\b",
-    r"(?i)\\btelegram\\.ext\\b",
-    r"(?i)https?://api\\.telegram\\.org",
-    r"(?i)\\b(?:BotFather|TelegramClient|ApplicationBuilder|Updater)\\b",
-    r"(?i)\\b(?:from|import)\\s+(?:telebot|aiogram|telegram|telegram_bot_api)\\b",
+    r"(?i)\b(?:telebot|telethon|aiogram|python-telegram-bot)\b",
+    r"(?i)\btelegram\.ext\b",
+    r"(?i)https?://api\.telegram\.org",
+    r"(?i)\b(?:BotFather|TelegramClient|ApplicationBuilder|Updater)\b",
+    r"(?i)\b(?:from|import)\s+(?:telebot|aiogram|telegram|telegram_bot_api)\b",
 )
 _WA_PATTERNS = (
     r"(?i)@(?:whiskeysockets/)?baileys",
-    r"(?i)\\b(?:whatsapp-web\\.js|venom-bot|wppconnect|@wppconnect-team|open-wa)\\b",
-    r"(?i)\\b(?:makeWASocket|LocalAuth|whatsapp-web)\\b",
+    r"(?i)\b(?:whatsapp-web\.js|venom-bot|wppconnect|@wppconnect-team|open-wa)\b",
+    r"(?i)\b(?:makeWASocket|LocalAuth|whatsapp-web)\b",
 )
 _DISCORD_PATTERNS = (
-    r"(?i)\\b(?:discord\\.py|pycord|nextcord|disnake|hikari)\\b",
-    r"(?i)\\b(?:discord\\.js|discord\\.Client|discord\\.Intents)\\b",
-    r"(?i)https?://(?:discord\\.com|discordapp\\.com)/api",
-    r"(?i)\\b(?:from|import)\\s+discord\\b",
+    r"(?i)\b(?:discord\.py|pycord|nextcord|disnake|hikari)\b",
+    r"(?i)\b(?:discord\.js|discord\.Client|discord\.Intents)\b",
+    r"(?i)https?://(?:discord\.com|discordapp\.com)/api",
+    r"(?i)\b(?:from|import)\s+discord\b",
 )
-
 def _upload_source_text(files_added: List[Tuple[str, bytes]]) -> str:
     parts = []
     for rel, raw in files_added[:80]:
