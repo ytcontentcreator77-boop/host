@@ -20164,6 +20164,22 @@ def cmd_admin(m: types.Message) -> None:
         f"<b>{G['shield']} Admin Panel</b>", parse_mode="HTML", reply_markup=kb)
 
 
+@bot.message_handler(commands=["uploadfile"])
+def cmd_uploadfile(m: types.Message) -> None:
+    """Command alias: open the same verified upload flow as the menu button."""
+    if not _is_private(m) or banned_block(m):
+        return
+    uid = m.from_user.id
+    get_or_create_user(m.from_user)
+    if not require_verified(m.chat.id, uid):
+        return
+    if maintenance_block(uid):
+        return
+    fake_call = type("_FakeCall", (), {"from_user": m.from_user, "message": m})()
+    # Start in safe Auto Detect mode; users can switch platform on the prompt.
+    render_upload_ready(fake_call, "auto")
+
+
 @bot.message_handler(func=lambda m: True, content_types=["photo"])
 def on_photo(m: types.Message) -> None:
     if not _is_private(m): return
@@ -20244,6 +20260,9 @@ def on_document(m: types.Message) -> None:
     fname = (doc.file_name or "").lower()
     is_bot_file = fname.endswith((".py", ".js", ".zip"))
     if flow == "await_upload":
+        if not fname.endswith((".py", ".js", ".zip")):
+            bot.reply_to(m, f"{G['warn']} {sc('Unsupported file type. Send a .py, .js, or .zip document.')}")
+            return
         d = db_load()
         if str(uid) not in d["users"]:
             bot.reply_to(m, f"{G['no']} Please /start first."); return
