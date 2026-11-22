@@ -1459,9 +1459,8 @@ def _build_local_photos() -> None:
             PHOTOS[key] = str(custom_out)
             continue
         out = out_dir / f"{key}.png"
-        if out.exists() and out.stat().st_size > 1024:
-            PHOTOS[key] = str(out)
-            continue
+        # Always refresh generated banners at startup. Older cached files
+        # may have been rendered with PIL's tiny bitmap fallback font.
         try:
             r, g, b = _hex(color)
             # Vertical gradient: lighten the top, darken the bottom.
@@ -1478,14 +1477,14 @@ def _build_local_photos() -> None:
             d.rectangle([(0, 430), (900, 460)], fill=(255, 255, 255))
             d.rectangle([(0, 432), (900, 458)], fill=(r, g, b))
 
-            big = (
-                ImageFont.truetype(font_path, 78) if font_path
-                else ImageFont.load_default()
-            )
-            small = (
-                ImageFont.truetype(font_path, 28) if font_path
-                else ImageFont.load_default()
-            )
+            try:
+                big = ImageFont.truetype(font_path, 78) if font_path else ImageFont.load_default(size=78)
+            except TypeError:
+                big = ImageFont.load_default()
+            try:
+                small = ImageFont.truetype(font_path, 32) if font_path else ImageFont.load_default(size=32)
+            except TypeError:
+                small = ImageFont.load_default()
 
             def _wh(s: str, f) -> Tuple[int, int]:
                 try:
@@ -4985,7 +4984,14 @@ def _captcha_font(size: int):
         except Exception:
             continue
     try:
-        return ImageFont.load_default()
+        # Pillow's scalable default font avoids tiny CAPTCHA text on
+        # minimal Railway/Termux images without system font packages.
+        return ImageFont.load_default(size=max(24, int(size)))
+    except TypeError:
+        try:
+            return ImageFont.load_default()
+        except Exception:
+            return None
     except Exception:
         return None
 
@@ -5270,7 +5276,9 @@ def require_group_membership(chat_id: int, uid: int) -> bool:
 # ─────────────────────────────────────────────────────────────────
 
 def _is_verified(uid: int) -> bool:
-    if uid == OWNER_ID and OWNER_ID > 0:
+    # Owner and every configured admin bypass human CAPTCHA.
+    # Regular users still need to complete verification once.
+    if is_admin(uid):
         return True
     u = db_load_ro()["users"].get(str(uid)) or {}
     return bool(u.get("verified"))
@@ -17461,7 +17469,9 @@ def _is_private(m) -> bool:
 
 
 def _is_verified(uid: int) -> bool:
-    if uid == OWNER_ID and OWNER_ID > 0:
+    # Owner and every configured admin bypass human CAPTCHA.
+    # Regular users still need to complete verification once.
+    if is_admin(uid):
         return True
     u = db_load_ro()["users"].get(str(uid)) or {}
     return bool(u.get("verified"))
