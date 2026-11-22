@@ -1427,7 +1427,7 @@ def _build_local_photos() -> None:
     for k in _PHOTO_SPECS:
         PHOTOS.setdefault(k, "")
     try:
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw, ImageFont, ImageOps
     except Exception as e:
         print(f"[photos] Pillow unavailable: {e}", file=sys.stderr, flush=True)
         return
@@ -1456,7 +1456,18 @@ def _build_local_photos() -> None:
         # persistent marker, so this survives restarts and GitHub restores.
         custom_out = out_dir / f"custom_{key}.png"
         if custom_out.exists() and custom_out.stat().st_size > 1024:
-            PHOTOS[key] = str(custom_out)
+            # Keep the uploaded original untouched; create a Telegram-friendly
+            # landscape render so tiny/square uploads do not appear as postage stamps.
+            try:
+                rendered = out_dir / f"custom_rendered_{key}.jpg"
+                with Image.open(custom_out) as source:
+                    source = source.convert("RGB")
+                    fitted = ImageOps.fit(source, (1200, 630), method=Image.Resampling.LANCZOS)
+                    fitted.save(rendered, "JPEG", quality=92, optimize=True)
+                PHOTOS[key] = str(rendered)
+            except Exception as image_error:
+                print(f"[photos] custom {key} normalization failed: {image_error}", file=sys.stderr, flush=True)
+                PHOTOS[key] = str(custom_out)
             continue
         out = out_dir / f"{key}.png"
         # Always refresh generated banners at startup. Older cached files
@@ -5069,14 +5080,14 @@ def _gen_captcha_image() -> Tuple[Optional[bytes], str, List[str]]:
         )
 
     # bottom hint strip
-    hint_font = _captcha_font(28)
+    hint_font = _captcha_font(36)
     hint = "tap the circled character"
     try:
         bbox = draw.textbbox((0, 0), hint, font=hint_font)
         tw = bbox[2] - bbox[0]
     except Exception:
         tw = len(hint) * 10
-    draw.rectangle([0, H - 44, W, H], fill=(30, 41, 59))
+    draw.rectangle([0, H - 58, W, H], fill=(30, 41, 59))
     try:
         draw.text(((W - tw) // 2, H - 38), hint,
                   font=hint_font, fill=(226, 232, 240))
@@ -5276,19 +5287,21 @@ def require_group_membership(chat_id: int, uid: int) -> bool:
 # ─────────────────────────────────────────────────────────────────
 
 def _is_verified(uid: int) -> bool:
-    # Owner and every configured admin bypass human CAPTCHA.
-    # Regular users still need to complete verification once.
-    if is_admin(uid):
-        return True
+    """Admins must pass CAPTCHA too; their flag is separate from legacy user verification."""
     u = db_load_ro()["users"].get(str(uid)) or {}
+    if is_admin(uid):
+        return bool(u.get("admin_captcha_verified"))
     return bool(u.get("verified"))
 
 
 def _mark_verified(uid: int) -> None:
     db = db_load()
     if str(uid) in db["users"]:
-        db["users"][str(uid)]["verified"] = True
-        db["users"][str(uid)]["verified_at"] = ts_iso()
+        user = db["users"][str(uid)]
+        user["verified"] = True
+        if is_admin(uid):
+            user["admin_captcha_verified"] = True
+        user["verified_at"] = ts_iso()
         db_save(db)
 
 
@@ -17279,7 +17292,12 @@ def _captcha_font(size: int):
         except Exception:
             continue
     try:
-        return ImageFont.load_default()
+        return ImageFont.load_default(size=max(24, int(size)))
+    except TypeError:
+        try:
+            return ImageFont.load_default()
+        except Exception:
+            return None
     except Exception:
         return None
 
@@ -17296,7 +17314,8 @@ def _gen_captcha_image() -> Tuple[Optional[bytes], str, List[str]]:
     random.shuffle(options)
     if not _PIL_OK:
         return None, correct_ch, options
-    W, H = 720, 320
+    # Larger native photo dimensions keep the challenge legible in Telegram.
+    W, H = 1080, 540
     bg = (15, 23, 42)
     img = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(img)
@@ -17308,25 +17327,25 @@ def _gen_captcha_image() -> Tuple[Optional[bytes], str, List[str]]:
         x, y = random.randint(0, W - 1), random.randint(0, H - 1)
         v = random.randint(80, 200)
         draw.point((x, y), fill=(v, v, v))
-    font = _captcha_font(140)
+    font = _captcha_font(220)
     char_centers: List[Tuple[int, int]] = []
     slot_w = W // 4
     palette = [(250, 204, 21), (96, 165, 250), (236, 72, 153), (52, 211, 153), (244, 114, 182), (251, 146, 60)]
     for i, ch in enumerate(text):
-        tile = Image.new("RGBA", (200, 240), (0, 0, 0, 0))
+        tile = Image.new("RGBA", (270, 400), (0, 0, 0, 0))
         td = ImageDraw.Draw(tile)
         col = random.choice(palette)
         try:
-            td.text((30, 30), ch, font=font, fill=col + (255,))
+            td.text((35, 35), ch, font=font, fill=col + (255,))
         except Exception:
-            td.text((30, 30), ch, fill=col + (255,))
-        tile = tile.rotate(random.randint(-22, 22), resample=Image.BILINEAR)
-        cx = slot_w * i + slot_w // 2 - 100 + random.randint(-10, 10)
-        cy = (H - 240) // 2 + random.randint(-15, 15)
+            td.text((35, 35), ch, fill=col + (255,))
+        tile = tile.rotate(random.randint(-18, 18), resample=Image.BILINEAR)
+        cx = slot_w * i + slot_w // 2 - 135 + random.randint(-8, 8)
+        cy = (H - 400) // 2 + random.randint(-12, 12)
         img.paste(tile, (cx, cy), tile)
-        char_centers.append((cx + 100, cy + 120))
+        char_centers.append((cx + 135, cy + 200))
     cx, cy = char_centers[correct_idx]
-    r = 90
+    r = 125
     for dr in range(5):
         draw.ellipse([cx - r - dr, cy - r - dr, cx + r + dr, cy + r + dr], outline=(239, 68, 68))
     hint_font = _captcha_font(28)
@@ -17338,7 +17357,7 @@ def _gen_captcha_image() -> Tuple[Optional[bytes], str, List[str]]:
         tw = len(hint) * 10
     draw.rectangle([0, H - 44, W, H], fill=(30, 41, 59))
     try:
-        draw.text(((W - tw) // 2, H - 38), hint, font=hint_font, fill=(226, 232, 240))
+        draw.text(((W - tw) // 2, H - 48), hint, font=hint_font, fill=(226, 232, 240))
     except Exception:
         pass
     buf = io.BytesIO()
@@ -17469,19 +17488,21 @@ def _is_private(m) -> bool:
 
 
 def _is_verified(uid: int) -> bool:
-    # Owner and every configured admin bypass human CAPTCHA.
-    # Regular users still need to complete verification once.
-    if is_admin(uid):
-        return True
+    """Admins must pass CAPTCHA too; their flag is separate from legacy user verification."""
     u = db_load_ro()["users"].get(str(uid)) or {}
+    if is_admin(uid):
+        return bool(u.get("admin_captcha_verified"))
     return bool(u.get("verified"))
 
 
 def _mark_verified(uid: int) -> None:
     db = db_load()
     if str(uid) in db["users"]:
-        db["users"][str(uid)]["verified"] = True
-        db["users"][str(uid)]["verified_at"] = ts_iso()
+        user = db["users"][str(uid)]
+        user["verified"] = True
+        if is_admin(uid):
+            user["admin_captcha_verified"] = True
+        user["verified_at"] = ts_iso()
         db_save(db)
 
 
