@@ -1461,7 +1461,7 @@ def _build_local_photos() -> None:
     # DejaVu/fallback fonts on minimal Linux images often lack these glyphs.
     banner_map = str.maketrans(
         "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘꜱᴛᴜᴠᴡxʏᴢ",
-        "abcdefghijklmnopqrstuvwxyz",
+        "abcdefghijklmnopstuvwxyz",
     )
     for key, (text, color, sub) in _PHOTO_SPECS.items():
         text = text.translate(banner_map).upper()
