@@ -17348,16 +17348,16 @@ def _gen_captcha_image() -> Tuple[Optional[bytes], str, List[str]]:
     r = 125
     for dr in range(5):
         draw.ellipse([cx - r - dr, cy - r - dr, cx + r + dr, cy + r + dr], outline=(239, 68, 68))
-    hint_font = _captcha_font(28)
+    hint_font = _captcha_font(36)
     hint = "tap the circled character"
     try:
         bbox = draw.textbbox((0, 0), hint, font=hint_font)
         tw = bbox[2] - bbox[0]
     except Exception:
-        tw = len(hint) * 10
-    draw.rectangle([0, H - 44, W, H], fill=(30, 41, 59))
+        tw = len(hint) * 18
+    draw.rectangle([0, H - 62, W, H], fill=(30, 41, 59))
     try:
-        draw.text(((W - tw) // 2, H - 48), hint, font=hint_font, fill=(226, 232, 240))
+        draw.text(((W - tw) // 2, H - 54), hint, font=hint_font, fill=(226, 232, 240))
     except Exception:
         pass
     buf = io.BytesIO()
